@@ -1,0 +1,22 @@
+
+base_name: diffgar-dataset-statistics
+processing_inputs:
+  - source: s3://maml-aimcdt/datasets/embeddings/song-describer/data/clap/1hz/
+    input_name: audio
+    destination: /opt/ml/processing/input
+processing_outputs:
+  - destination: s3://maml-aimcdt/datasets/embeddings/song-describer/data/clap/1hz/
+    output_name: npy
+    source: /opt/ml/processing/output
+processor:
+  image_uri: 427750820708.dkr.ecr.us-east-1.amazonaws.com/diffgar/training:latest
+  instance_count: 1
+  role: maml-aimcdt-sagemaker
+  instance_type: ml.g5.2xlarge
+  volume_size_in_gb: 200
+  entrypoint: [python, dataset_statistics.py, --path, /opt/ml/processing/input]
+  tags:
+    - Key: Project
+      Value: maml-diffgar
+    - Key: Application-Name
+      Value: MAML
