@@ -103,6 +103,11 @@ class TextAudioDataset(Dataset):
                 try:
                     
                     audio = np.load(file_path,mmap_mode='r')
+                    
+                    if audio.ndim == 3:
+                        # stereo, mean the first dimension
+                        audio = audio.mean(0)
+                    
                     if audio.shape[0] > self.truncate_preextracted:
                         rand_start = random.randint(0,audio.shape[0]-self.truncate_preextracted)
                         audio = audio[rand_start:rand_start+self.truncate_preextracted]
@@ -114,10 +119,12 @@ class TextAudioDataset(Dataset):
                         rand_start = random.randint(0,audio.shape[0]-self.truncate_preextracted)
                         audio = audio[rand_start:rand_start+self.truncate_preextracted, :]
                         audio = torch.tensor(audio)
+                    
                         
                 except Exception as e:
                     print(f"Error loading preextracted features: {e}") if verbose else None
                     return self[idx + 1]
+                
         
         if self.return_text:
             possible_captions = annot['caption']
@@ -278,3 +285,4 @@ class TextAudioDataset(Dataset):
         
         except:
             return None
+        

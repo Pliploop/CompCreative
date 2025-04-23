@@ -129,6 +129,22 @@ def get_upmm_annotations(data_path = None, csv_path = None):
     
     return records
 
+
+def get_mtg_jamendo_annotations(data_path = None, csv_path = None):
+    data_path = data_path if data_path is not None else '/import/research_c4dm/jpmg86/mtg-jamendo/data/audio'
+    csv_path = os.path.join(os.path.dirname(data_path), 'mtg_jamendo.csv') if csv_path is None else csv_path
+    
+    df = pd.read_csv(csv_path)
+    
+    df['file_path'] = os.path.join(data_path) + '/' + df['file_path']
+    
+    records = df.to_dict(orient = 'records')
+    
+    for record in records:
+        record['caption'] = {sha256(record['caption'].encode('utf-8')).hexdigest(): record['caption']}
+    
+    return records
+
 def get_folder_annotations(data_path = None):
     
     # recursively get all files in the data_path directory that are audio files, and their paths
@@ -145,7 +161,7 @@ def get_folder_annotations(data_path = None):
 
 class TextAudioDataModule(LightningDataModule):
     
-    def __init__(self, tasks, dataloader_kwargs, return_audio = True, return_text = True, concept = None, target_n_samples = 96000, target_sr = 48000, batch_size = 32, num_workers = 0, preextracted_features = False, truncate_preextracted = 50, root_dir = None, new_dir = None):
+    def __init__(self, tasks, dataloader_kwargs, root_dir = None, new_dir = None):
 
 
         super().__init__()
@@ -177,17 +193,7 @@ class TextAudioDataModule(LightningDataModule):
         self.truncate_preextracted = dataloader_kwargs.get('truncate_preextracted', 50)
         
         
-        # quick hack for a special musiccaps task
-        if 'musiccaps_truncated' in [task['task'] for task in tasks]:
-            truncate_preextracted = []
-            for task in tasks:
-                if task['task'] != 'musiccaps_truncated':
-                    truncate_preextracted.append(self.truncate_preextracted) 
-                else: truncate_preextracted.append(1)
-                
-            self.truncate_preextracted = truncate_preextracted
-        else:
-            self.truncate_preextracted = [self.truncate_preextracted for _ in range(len(tasks))]
+        self.truncate_preextracted = [self.truncate_preextracted for _ in range(len(tasks))]
         
         self.root_dirs = [task_.get('root_dir', None) for task_ in tasks]
         self.new_dirs = [task_.get('new_dir', None) for task_ in tasks]

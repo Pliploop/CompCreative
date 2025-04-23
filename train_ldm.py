@@ -1,4 +1,4 @@
-from diffgar.models.ldm.diffusion import LightningDiffGar, LightningMSEGar, LightningMLPldm, LightningMLPMSE
+from diffgar.models.ldm.diffusion import LightningLDM
 from diffgar.dataloading.dataloaders import TextAudioDataModule
 from pytorch_lightning.cli import SaveConfigCallback, LightningCLI
 from pytorch_lightning import LightningModule, Trainer
@@ -79,7 +79,7 @@ class MyLightningCLI(LightningCLI):
         parser.add_argument("--ckpt_path", default="checkpoints")
         parser.add_argument("--resume_id", default=None)
         parser.add_argument("--resume_from_checkpoint", default=None)
-        parser.add_argument("--project", default="DiffGAR-LDM")
+        parser.add_argument("--project", default="CreativeComp")
         parser.add_argument("--test", default=False)
         parser.add_argument("--callbacks", default=[])
 
