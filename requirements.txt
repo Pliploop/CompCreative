@@ -54,10 +54,9 @@ attrs==23.1.0
 audiomentations==0.34.1
 audioread==3.0.1
 av==10.0.0
-awscli==1.33.9
+awscli
 blis==0.7.11
-boto3==1.35.14
-botocore
+boto3
 braceexpand==0.1.7
 build==0.10.0
 cachetools==5.3.2
