@@ -316,7 +316,8 @@ class LDM(BaseModule):
 
     @torch.no_grad()
     def inference(self, prompt, inference_scheduler = None, num_steps=20, guidance_scale=None, num_samples_per_prompt=1, 
-                  disable_progress=True, slider = None, slider_scale = 0, negative_prompt = None, return_all_latents = False):
+                  disable_progress=True, slider = None, slider_scale = 0, negative_prompt = None, return_all_latents = False,
+                  inpaint_mask = None, inpaint_audio = None, audio_length = None):
         
         
         device = next(self.parameters()).device
@@ -351,8 +352,15 @@ class LDM(BaseModule):
         timesteps = inference_scheduler.timesteps
 
         num_channels_latents = self.unet_model_config["in_channels"]
-        latents = self.prepare_latents(batch_size, inference_scheduler, num_channels_latents, prompt_embeds.dtype, device)
-    
+        
+        
+        if inpaint_audio is not None:
+            inpaint_latents = self.ae_encode(inpaint_audio)
+        else:
+            inpaint_latents = None
+        latents, inpaint_mask = self.prepare_latents(batch_size, inference_scheduler, num_channels_latents, prompt_embeds.dtype, device, inpaint_mask=inpaint_mask, inpaint_audio=inpaint_latents, audio_length=audio_length)
+
+        
 
         num_warmup_steps = len(timesteps) - num_steps * inference_scheduler.order
         progress_bar = tqdm(range(num_steps), disable=disable_progress, leave=False)
@@ -365,6 +373,11 @@ class LDM(BaseModule):
 
         for i, t in enumerate(timesteps):
             latent_model_input = latents
+            
+            # apply the mask to the latents
+            if inpaint_mask is not None:
+                latent_model_input = self.apply_inpaint_mask(latent_model_input, inpaint_mask, inpaint_latents)
+            
             latent_model_input = inference_scheduler.scale_model_input(latent_model_input, t)
 
             # expand t to batch size
@@ -387,6 +400,12 @@ class LDM(BaseModule):
         
         return self.ae_decode(latents)
     
+    def apply_inpaint_mask(self, latents, inpaint_mask, inpaint_latents):
+        # apply the mask to the latents
+        inpaint_latents = inpaint_latents * inpaint_mask
+        latents = latents * (1 - inpaint_mask) + inpaint_latents
+        return latents
+    
     @torch.no_grad()
     def invert(
         self,
@@ -399,7 +418,9 @@ class LDM(BaseModule):
         num_images_per_prompt=1,
         negative_prompt = None,
         return_intermediate_latents = False,
-        verbose= False
+        verbose= False,
+        guiding_audio = None,
+        mask = None,
     ):
     
         inversion_scheduler = DDIMInverseScheduler.from_pretrained(self.scheduler_name, subfolder="scheduler", prediction_type=self.noise_scheduler.config.prediction_type)
@@ -424,7 +445,34 @@ class LDM(BaseModule):
             "last_hidden_state"
         ].repeat_interleave(num_images_per_prompt, 0)
     
+        
+        unconditional_prompt_embeddings = self.encode_text([""] * len(original_prompt))[ 
+            "last_hidden_state"
+        ].repeat_interleave(num_images_per_prompt, 0)
+        
+    
         latents = self.ae_encode(audio)
+        
+        
+        ##interpolate mask if exists
+        if mask is not None:
+            original_mask_len = mask.shape[1]
+            target_length = latents.shape[1]
+            
+            mask = F.interpolate(mask.unsqueeze(1).float(), size=(target_length,), mode='linear', align_corners=False)
+            #round to 0 or 1
+            mask = (mask > 0.5).float()
+        
+        
+        if guiding_audio is not None:
+            guiding_latents = self.ae_encode(guiding_audio)
+            # truncate or pad to the same length
+            if latents.shape[1] > guiding_latents.shape[1]:
+                guiding_latents = F.pad(guiding_latents, (0, latents.shape[1] - guiding_latents.shape[1]), mode='constant', value=0)
+            elif latents.shape[1] < guiding_latents.shape[1]:
+                guiding_latents = guiding_latents[:, :latents.shape[1]]
+        
+        
         intermediate_latents = [latents]
         
         inversion_scheduler.set_timesteps(inference_steps, device=device)
@@ -439,6 +487,9 @@ class LDM(BaseModule):
         ## go back to start steps using the inverse scheduler and then back to the start_latents with the new prompt
         
         ts = []
+        
+        original_latents = latents.clone()
+        
         for i in tqdm(range(invert_steps), disable= not verbose, leave = False, desc="Inverting"):
             
             t = inversion_scheduler.timesteps[i]
@@ -453,15 +504,16 @@ class LDM(BaseModule):
             )
             
             latents = inversion_scheduler.step(noise_pred, t, latents).prev_sample
+            
+            ## if mask exists, only the unmasked latents are inverted
+            if mask is not None:
+                latents = original_latents * mask + latents * (1 - mask)
+            
             intermediate_latents.append(latents)
         
         edit_latents = latents.clone()
         latent_model_input = edit_latents
         intermediate_edit_latents = []
-        
-        # self.inference_scheduler.set_timesteps(invert_steps, device=device)
-        
-        # for i in tqdm(range(inference_steps- invert_steps, inference_steps), disable= not verbose, leave=False, desc="Reverting with edit"):
         
         for i,t in tqdm(enumerate(ts[::-1]), disable= not verbose, leave=False, desc="Reverting with edit"):
         
@@ -472,11 +524,28 @@ class LDM(BaseModule):
             bsz = latent_model_input.shape[0]
             time = torch.full((bsz,), t, dtype=torch.long, device=device)
             
-            pred = self.unet(
-                latent_model_input, time = time, embedding=edit_prompt_embedding, embedding_scale=guidance_scale, embedding_mask_proba=0, negative_embedding = negative_prompt_embeddings
-            )
             
-            latents = self.inference_scheduler.step(pred, t, latents).prev_sample
+            if guiding_audio is not None:
+            
+                pred = self.unet(
+                    latent_model_input, time = time, embedding=edit_prompt_embedding, embedding_scale=guidance_scale, embedding_mask_proba=0, negative_embedding = negative_prompt_embeddings
+                )
+                latents = self.inference_scheduler.step(pred, t, latents).prev_sample
+            
+                
+            else:
+                
+                pred = self.unet(
+                    latent_model_input, time = time, embedding=edit_prompt_embedding, embedding_scale=guidance_scale, embedding_mask_proba=0, negative_embedding = negative_prompt_embeddings
+                )
+                
+                latents = self.inference_scheduler.step(pred, t, latents).prev_sample
+                ## move towards the guiding latents with guidance scale
+                latents = latents + (guidance_scale * (guiding_latents - latents))
+            
+            if mask is not None:
+                latents = original_latents * mask + latents * (1 - mask)
+            
             intermediate_edit_latents.append(latents)
             latent_model_input = latents
             
@@ -485,12 +554,35 @@ class LDM(BaseModule):
         
         return self.ae_decode(latents)
     
-    def prepare_latents(self, batch_size, inference_scheduler, num_channels_latents, dtype, device):
-        shape = (batch_size, num_channels_latents, 512)
+    def prepare_latents(self, batch_size, inference_scheduler, num_channels_latents, dtype, device, inpaint_mask=None, inpaint_audio=None, audio_length=None, **kwargs):
+        
+        if inpaint_audio is not None:
+            # interpolate the mask to the latent size 
+            # mask of shape [B, arbitrary_length]
+            # interpolate to [batch_size, num_channels_latents, latent_length]
+            
+            original_mask_len = inpaint_mask.shape[1]
+            target_length = inpaint_audio.shape[2]
+            
+            inpaint_mask = F.interpolate(inpaint_mask.unsqueeze(1).float(), size=(target_length,), mode='linear', align_corners=False)
+            #round to 0 or 1
+            inpaint_mask = (inpaint_mask > 0.5).float()
+        
+        latent_length = audio_length if audio_length is not None else self.latent_length
+        
+        shape = (batch_size, num_channels_latents, latent_length) if inpaint_audio is None else inpaint_latents.shape
         latents = randn_tensor(shape, generator=None, device=device, dtype=dtype)
-        # scale the initial noise by the standard deviation required by the scheduler
+        
+        if inpaint_audio is not None:
+            # apply the mask to the latents
+            inpaint_latents = inpaint_audio * inpaint_mask
+            latents = latents * (1 - inpaint_mask) + inpaint_latents
+        
         latents = latents * inference_scheduler.init_noise_sigma
-        return latents
+        if inpaint_audio is not None:
+            latents = latents * (1 - inpaint_mask) + inpaint_latents
+        return latents, inpaint_mask
+    
     
     
 class LightningLDM(LDM,LightningModule):
