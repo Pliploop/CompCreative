@@ -175,7 +175,7 @@ class LDM(BaseModule):
         unet_ckpt=None,
         freeze_encoder_pair=True,
         freeze_unet=False,
-        latent_length=1024,
+        latent_length=512,
         tag_conditioning=True, # if true, splits the text embedding before encoding
         device=None,
         **kwargs
@@ -484,7 +484,7 @@ class LDM(BaseModule):
         return intermediate_edit_latents[-1], intermediate_latents, intermediate_edit_latents if return_intermediate_latents else intermediate_edit_latents[-1]
     
     def prepare_latents(self, batch_size, inference_scheduler, num_channels_latents, dtype, device):
-        shape = (batch_size, num_channels_latents, 64)
+        shape = (batch_size, num_channels_latents, self.latent_length)
         latents = randn_tensor(shape, generator=None, device=device, dtype=dtype)
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * inference_scheduler.init_noise_sigma
@@ -516,7 +516,7 @@ class LightningLDM(LDM,LightningModule):
                 scheduler = None,
                 generate_every_n_epochs = 50,
                 tag_conditioning=True,
-                latent_length=1024,
+                latent_length=512,
                 **kwargs
                 ):
         
