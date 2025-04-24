@@ -1,4 +1,4 @@
-from tqdm import tqdm
+from tqdm.rich import tqdm
 
 import torch
 import torch.nn as nn
@@ -18,6 +18,9 @@ import numpy as np
 import yaml
 import scipy
 import music2latent
+import wandb
+import torchaudio
+import os
 
 
 
@@ -194,7 +197,6 @@ class LDM(BaseModule):
         self.latent_length = latent_length
         self.tag_conditioning = tag_conditioning
         
-        self.ae = music2latent.EncoderDecoder()
         
         ## UNET MODEL
         
@@ -239,7 +241,9 @@ class LDM(BaseModule):
         self.first_run = False
         
         if device is not None:
-            self.to(device)   
+            self.to(device)  
+            
+        self.ae = music2latent.EncoderDecoder(device = device)
             
             
     def ae_encode(self, audio):
@@ -247,7 +251,8 @@ class LDM(BaseModule):
     
     
     def ae_decode(self, latents):
-        return self.ae.decode(latents.permute(1,0))     
+        # print(f"Latents shape: {latents.shape}")
+        return self.ae.decode(latents)   
            
 
     def forward(self, latents, prompt, validation_mode=False):
@@ -355,6 +360,8 @@ class LDM(BaseModule):
         guidance_scale = self.unet_model_config['infer_classifier_free_guidance_strength'] if guidance_scale is None else guidance_scale
 
         all_latents = []
+        
+        # print(f"Latents shape: {latents.shape}")
 
         for i, t in enumerate(timesteps):
             latent_model_input = latents
@@ -377,11 +384,6 @@ class LDM(BaseModule):
 
             all_latents.append(latents)
 
-        # all_latents = torch.stack(all_latents, dim=0)
-        # if return_all_latents:
-        #     return latents, all_latents
-        # else:
-        #     return latents
         
         return self.ae_decode(latents)
     
@@ -481,10 +483,10 @@ class LDM(BaseModule):
         intermediate_edit_latents = torch.stack(intermediate_edit_latents, dim=0)
         intermediate_latents = torch.stack(intermediate_latents, dim=0)
         
-        return intermediate_edit_latents[-1], intermediate_latents, intermediate_edit_latents if return_intermediate_latents else intermediate_edit_latents[-1]
+        return self.ae_decode(latents)
     
     def prepare_latents(self, batch_size, inference_scheduler, num_channels_latents, dtype, device):
-        shape = (batch_size, num_channels_latents, self.latent_length)
+        shape = (batch_size, num_channels_latents, 512)
         latents = randn_tensor(shape, generator=None, device=device, dtype=dtype)
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * inference_scheduler.init_noise_sigma
@@ -514,7 +516,7 @@ class LightningLDM(LDM,LightningModule):
                 preextracted_latents = True,
                 optimizer: OptimizerCallable = None,
                 scheduler = None,
-                generate_every_n_epochs = 50,
+                generate_every_n_epochs = 5,
                 tag_conditioning=True,
                 latent_length=512,
                 **kwargs
@@ -601,11 +603,38 @@ class LightningLDM(LDM,LightningModule):
             self.log(f'val_{key}', loss_dict[key], on_step=False, on_epoch=True, prog_bar=True)
             
             
-        ## generate some samples for validation
-        # if self.current_epoch % self.generate_every_n_epochs:
-        #     preds = self.inference(prompt, self.inference_scheduler, num_steps = 50, disable_progress = False, guidance_scale = self.unet_model_config['infer_classifier_free_guidance_strength'])
-        #     preds = preds.permute(0,2,1)
-        #     # decode with music2latent
+        # generate some samples for validation
+        if self.current_epoch % self.generate_every_n_epochs and batch_idx==0:
+            
+            
+            preds = self.inference(prompt[:16], self.inference_scheduler, num_steps = 50, disable_progress = False, guidance_scale = self.unet_model_config['infer_classifier_free_guidance_strength'])
+            preds = preds.cpu()
+            #log to wandb
+            gt = self.ae_decode(audio[:16,...].permute(0,2,1)).cpu()
+            
+            print(preds.shape, gt.shape)
+            
+            for i in range(16):
+                pred_ = preds[i].unsqueeze(0)
+                gt_ = gt[i].unsqueeze(0)
+                caption_ = prompt[i]
+                
+                print(pred_.shape, gt_.shape)
+                
+                # save to logs/epoch
+                pred_path = f"logs/{self.current_epoch}/pred_{caption_}.wav"
+                gt_path = f"logs/{self.current_epoch}/gt_{caption_}.wav"
+                
+                os.makedirs(os.path.dirname(pred_path), exist_ok=True)
+                
+                torchaudio.save(pred_path, pred_, 44100)
+                torchaudio.save(gt_path, gt_, 44100)
+                
+                
+            
+            
+            
+            # decode with music2latent
             
         
         return loss

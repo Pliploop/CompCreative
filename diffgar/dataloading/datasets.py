@@ -111,14 +111,14 @@ class TextAudioDataset(Dataset):
                     if audio.shape[0] > self.truncate_preextracted:
                         rand_start = random.randint(0,audio.shape[0]-self.truncate_preextracted)
                         audio = audio[rand_start:rand_start+self.truncate_preextracted]
-                        audio = torch.tensor(audio)
+                        audio = torch.from_numpy(audio)
                     else:
                         #repeat the audio to match the target_n_samples
                         n_repeat = self.truncate_preextracted // audio.shape[0] +1
                         audio = np.repeat(audio, n_repeat, axis=0)
                         rand_start = random.randint(0,audio.shape[0]-self.truncate_preextracted)
                         audio = audio[rand_start:rand_start+self.truncate_preextracted, :]
-                        audio = torch.tensor(audio)
+                        audio = torch.from_numpy(audio)
                     
                         
                 except Exception as e:
