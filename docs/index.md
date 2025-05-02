@@ -1,6 +1,6 @@
 ---
 layout: default
-title: ECS7022P Project Companion
+title: ECS7022P Project Companion - Julien Guinot
 ---
 
 # Computational Creativity – Project Companion
