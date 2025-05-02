@@ -2,4 +2,9 @@
     background-color: #8ad2ff;
     background-image: none;
   }
+
+.wrapper {
+    width: 75%;
+    margin: 0 auto;
+  }
   

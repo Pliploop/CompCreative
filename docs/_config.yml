@@ -1,2 +1,16 @@
 title: ECS7022P Project Companion
 theme: jekyll-theme-cayman
+
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+
+# Add this
+sass:
+  style: compressed
+
+include:
+  - assets/css/custom.css
