@@ -177,16 +177,67 @@ Examples: Interpolation, blending, mirroring
 ### 🖼 Image-Style Latent Edits
 Examples: Contrast, Jitter, Bloat, Warp
 
-### 🔹 Example 1 – Adjusted Contrast + Warp
-<img src="content/samples/latent_img1.png" alt="Contrast Warp" width="500" />
+**Source A (Dynasties and Dystopia)**  
 <audio controls>
-  <source src="content/samples/latent_img1.wav" type="audio/wav">
+  <source src="docs/content/samples/A_dynasties_and_dystopia.wav" type="audio/wav">
 </audio>
 
-### 🔹 Example 3 – Brightness + blur
-<img src="content/samples/latent_img3.png" alt="Cutout Jitter" width="500" />
+
+### 🔹 Example 1 – Emboss
+
+#### example of image embossing
+
+<img src="content/emboss.jpg" alt="Emboss" width="500" />
+
+#### applied to Music2Latent
+
+<img src="content/samples/EmbossA.png" alt="Emboss" width="500" />
 <audio controls>
-  <source src="content/samples/latent_img3.wav" type="audio/wav">
+  <source src="content/samples/emboss_A.wav" type="audio/wav">
+</audio>
+
+
+
+### 🔹 Example 2 – Jitter
+
+#### example of image color jitter
+
+<img src="content/jitter.png" alt="Jitter" width="500" />
+
+
+#### applied to Music2Latent
+
+<img src="content/samples/JitterA.png" alt="Jitter" width="500" />
+<audio controls>
+  <source src="content/samples/Jitter.wav" type="audio/wav">
+</audio>
+
+### 🔹 Example 3 – Solarize
+
+#### example of image Solarization
+
+<img src="content/sddefault.jpg" alt="Solarize" width="500" />
+
+
+#### applied to Music2Latent
+
+<img src="content/samples/Solarize.png" alt="Solarize" width="500" />
+<audio controls>
+  <source src="content/samples/Solarize.wav" type="audio/wav">
+</audio>
+
+### 🔹 Example 3 – Invert
+
+#### example of image Inversion
+
+<img src="content/invertx.jpeg" alt="Invert" width="500" />
+
+
+#### applied to Music2Latent
+
+<img src="content/samples/Invert.png" alt="Invert" width="500" />
+<audio controls>
+  <source src="content/samples/Invert.wav" type="audio/wav">
 </audio>
 
 ---
