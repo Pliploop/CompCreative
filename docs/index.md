@@ -179,7 +179,7 @@ Examples: Contrast, Jitter, Bloat, Warp
 
 **Source A (Dynasties and Dystopia)**  
 <audio controls>
-  <source src="docs/content/samples/A_dynasties_and_dystopia.wav" type="audio/wav">
+  <source src="content/samples/A_dynasties_and_dystopia.wav" type="audio/wav">
 </audio>
 
 
