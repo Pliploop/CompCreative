@@ -162,13 +162,13 @@ Examples: Interpolation, blending, mirroring
 
 ### 🔹 Example 3 – Smooth
 **Source A (Dynasties and Dystopia) - gaussian kernel std: 3.0:**  
-<img src="content/samples/SmoothA.png" alt="Source A Spectrogram" width="250" />
+<img src="content/samples/SmoothA.png" alt="Source A Spectrogram" width="500" />
 <audio controls>
   <source src="content/samples/SmoothA.wav" type="audio/wav">
 </audio>
 
 **Source B (Pump It):  - gaussian kernel std: 2.0:**  
-<img src="content/samples/SmoothB.png" alt="Source B Spectrogram" width="250" />
+<img src="content/samples/SmoothB.png" alt="Source B Spectrogram" width="500" />
 <audio controls>
   <source src="content/samples/SmoothB.wav" type="audio/wav">
 </audio>
